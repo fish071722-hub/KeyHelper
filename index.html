@@ -262,19 +262,6 @@
   .chip{ font-family:'JetBrains Mono',monospace; font-size: 15px; font-weight: 500; background: var(--bg-panel-raised); border:1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 11px; color: var(--text-dim); }
   .chip-row.target .chip{ background: var(--brass-glow); border-color: var(--brass-dim); color: var(--brass); }
   .field-label.spaced{ margin-top: 14px; }
-
-  .lib-card{ background: var(--bg-panel-raised); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 10px; }
-  .lib-top{ display:flex; justify-content:space-between; align-items:baseline; gap: 10px; flex-wrap: wrap; }
-  .lib-title{ font-size: 14px; font-weight: 700; }
-  .lib-meta{ font-size: 11px; color: var(--text-faint); white-space: nowrap; }
-  .lib-chords{ display:flex; flex-wrap:wrap; gap: 6px; margin: 10px 0; }
-  .lib-actions{ display:flex; gap: 8px; align-items:center; flex-wrap: wrap; }
-  .lib-actions .key-select{ flex: 1; min-width: 90px; padding: 9px 30px 9px 12px; font-size: 14px; }
-  .lib-actions .back-btn{ white-space: nowrap; }
-  .lib-result{ margin-top: 8px; }
-  .lib-delete-btn{ color: var(--coral); border-color: rgba(227,111,92,0.35); }
-  .lib-delete-btn:hover{ border-color: var(--coral); color: var(--coral); }
-  .lib-delete-btn.armed{ background: var(--coral); border-color: var(--coral); color:#2A0D06; font-weight:700; }
 </style>
 </head>
 <body>
@@ -415,18 +402,7 @@
         <label class="field-label spaced">변환 결과</label>
         <div class="chip-row target" id="tlTransChips"></div>
         <button class="primary-btn" id="tlPlay">▶ 진행 재생</button>
-        <label class="field-label spaced" for="tlTitle">제목 (선택)</label>
-        <input class="key-select mono" id="tlTitle" type="text" placeholder="예: 주기도문 전주" style="margin-bottom:10px;">
-        <button class="back-btn" id="tlShare" style="width:100%; text-align:center;">이 진행을 라이브러리에 공유하기</button>
-        <p class="hint" id="tlShareStatus" style="margin:8px 0 0; text-align:center;"></p>
       </div>
-    </div>
-
-    <div class="card">
-      <h3>커뮤니티 라이브러리</h3>
-      <p class="hint">다른 사용자가 공유한 코드 진행입니다. 조를 골라 옮겨보거나 재생해 보세요.</p>
-      <button class="back-btn" id="libRefresh" style="margin-bottom:12px;">↻ 새로고침</button>
-      <div id="libList"><p class="hint">불러오는 중…</p></div>
     </div>
   </div>
 
@@ -549,24 +525,6 @@
     return String(s).replace(/[&<>"']/g, function(c){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
-  }
-  function armDeleteButton(btn, onConfirm){
-    if(btn._armed){
-      clearTimeout(btn._armTimer);
-      btn._armed = false;
-      btn.classList.remove('armed');
-      onConfirm();
-      return;
-    }
-    btn._armed = true;
-    btn.classList.add('armed');
-    var original = btn.textContent;
-    btn.textContent = '한 번 더 누르면 삭제';
-    btn._armTimer = setTimeout(function(){
-      btn._armed = false;
-      btn.classList.remove('armed');
-      btn.textContent = original;
-    }, 3500);
   }
 
   function fillKeySelect(sel, defaultKey){
@@ -1092,101 +1050,6 @@
   document.getElementById('tlPlay').addEventListener('click', function(){
     if(tlLastTrans.length) playProgression(tlLastTrans);
   });
-
-  /* 구글시트를 백엔드로 쓰는 커뮤니티 라이브러리.
-     아래 URL을 본인이 배포한 Apps Script 웹앱 주소로 반드시 교체하세요.
-     (배포 방법은 함께 받은 Code.gs / 안내문 참고) */
-  var SHEET_API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
-
-  function sheetConfigured(){ return SHEET_API_URL && SHEET_API_URL.indexOf('YOUR_') !== 0; }
-
-  function fetchLibrary(){
-    var out = document.getElementById('libList');
-    if(!sheetConfigured()){
-      out.innerHTML = '<p class="hint">구글시트 연동 주소(SHEET_API_URL)가 아직 설정되지 않았습니다.</p>';
-      return;
-    }
-    fetch(SHEET_API_URL + '?action=list')
-      .then(function(r){ return r.json(); })
-      .then(function(rows){ renderLibrary(rows || []); })
-      .catch(function(){ out.innerHTML = '<p class="hint">라이브러리를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</p>'; });
-  }
-
-  function renderLibrary(rows){
-    var out = document.getElementById('libList');
-    if(!rows.length){ out.innerHTML = '<p class="hint">아직 공유된 진행이 없습니다. 첫 진행을 공유해 보세요.</p>'; return; }
-    out.innerHTML = '';
-    rows.forEach(function(data){
-      if(!data || !data.chords) return;
-      var chords = data.chords;
-      if(typeof chords === 'string'){ try{ chords = JSON.parse(chords); }catch(e){ chords = []; } }
-      var originKey = KEYS.indexOf(data.originKey)!==-1 ? data.originKey : 'C';
-      var card = document.createElement('div');
-      card.className = 'lib-card';
-      var chordsHtml = chords.map(function(c){ return '<span class="chip mono">'+escapeHtml(c)+'</span>'; }).join('');
-      card.innerHTML =
-        '<div class="lib-top"><span class="lib-title">'+escapeHtml(data.title||'이름 없는 진행')+'</span><span class="lib-meta mono">원본 '+escapeHtml(originKey)+'</span></div>'+
-        '<div class="lib-chords">'+chordsHtml+'</div>'+
-        '<div class="lib-actions">'+
-          '<select class="key-select mono lib-key-select"></select>'+
-          '<button class="back-btn lib-view-btn">이 조로 보기</button>'+
-          '<button class="back-btn lib-play-btn">▶ 재생</button>'+
-          '<button class="back-btn lib-delete-btn">삭제</button>'+
-        '</div>'+
-        '<div class="chip-row target lib-result"></div>';
-      var keySel = card.querySelector('.lib-key-select');
-      KEYS.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; keySel.appendChild(o); });
-      keySel.value = originKey;
-      var resultEl = card.querySelector('.lib-result');
-      function updateResult(){
-        var shift = pc(keyIndex(keySel.value) - keyIndex(originKey));
-        var flats = useFlatsForKey(keySel.value);
-        var trans = chords.map(function(t){ return transposeChordToken(t, shift, flats); });
-        resultEl.innerHTML = trans.map(function(c){ return '<span class="chip mono">'+escapeHtml(c)+'</span>'; }).join('');
-        return trans;
-      }
-      card.querySelector('.lib-view-btn').addEventListener('click', updateResult);
-      card.querySelector('.lib-play-btn').addEventListener('click', function(){ playProgression(updateResult()); });
-      card.querySelector('.lib-delete-btn').addEventListener('click', function(e){
-        var btn = e.currentTarget;
-        armDeleteButton(btn, function(){
-          fetch(SHEET_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'delete', id: data.id })
-          }).then(function(){ fetchLibrary(); })
-            .catch(function(){
-              btn.textContent = '삭제 실패';
-              setTimeout(function(){ btn.textContent = '삭제'; }, 2000);
-            });
-        });
-      });
-      out.appendChild(card);
-    });
-  }
-  document.getElementById('tlShare').addEventListener('click', function(){
-    var statusEl = document.getElementById('tlShareStatus');
-    if(!tlLastOrig.length) return;
-    if(!sheetConfigured()){ statusEl.textContent = '구글시트 연동 주소가 설정되지 않았습니다.'; return; }
-    var title = document.getElementById('tlTitle').value.trim() || '이름 없는 진행';
-    statusEl.textContent = '공유하는 중…';
-    fetch(SHEET_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'add', title: title, originKey: tlFrom.value, chords: tlLastOrig })
-    }).then(function(){
-      document.getElementById('tlTitle').value = '';
-      statusEl.textContent = '공유되었습니다.';
-      setTimeout(function(){ statusEl.textContent = ''; }, 2500);
-      fetchLibrary();
-    }).catch(function(){
-      statusEl.textContent = '공유에 실패했습니다. 잠시 후 다시 시도해 주세요.';
-    });
-  });
-  var libRefreshBtn = document.getElementById('libRefresh');
-  if(libRefreshBtn) libRefreshBtn.addEventListener('click', fetchLibrary);
-  fetchLibrary();
-  setInterval(fetchLibrary, 20000);
 
   /* ================= 네비게이션 ================= */
   function showScreen(id){
